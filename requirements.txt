@@ -1,7 +1,8 @@
 # --- AI-Trader dependencies ---
-# Pinned to reasonably recent, stable versions. If install fails, you can
-# loosen these by removing the "==x.y.z" part.
+# These use ">=" ("this version or newer") so pip can grab a ready-made
+# package for YOUR Python version instead of trying to compile from source
+# (which is slow and needs a C compiler you probably don't have).
 
-alpaca-py==0.33.1     # Official Alpaca brokerage SDK (data + trading)
-pandas==2.2.3         # Tables of numbers; we use it to compute indicators
-python-dotenv==1.0.1  # Reads your secret keys from the .env file
+alpaca-py>=0.33     # Official Alpaca brokerage SDK (data + trading)
+pandas>=2.2         # Tables of numbers; we use it to compute indicators
+python-dotenv>=1.0  # Reads your secret keys from the .env file
