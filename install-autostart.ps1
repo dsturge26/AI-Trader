@@ -56,8 +56,14 @@ $action = New-ScheduledTaskAction -Execute $psExe `
             -Argument "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$startScript`"" `
             -WorkingDirectory $ProjectDir
 
+# Your FULL Windows identity, e.g. "DESKTOP-ABC\Drew" or "MicrosoftAccount\you@..".
+# Using the full name (not just "Drew") is what lets an interactive task actually
+# attach to your logged-in session and start.
+$CurrentUser = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
+Write-Host "Registering task to run as: $CurrentUser"
+
 # Trigger: every time you log on to Windows.
-$trigger = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME
+$trigger = New-ScheduledTaskTrigger -AtLogOn -User $CurrentUser
 
 # Settings: keep it running (no time limit), restart up to 3x if it crashes,
 # and start it even if the PC was busy/asleep when you logged in.
@@ -70,7 +76,7 @@ $settings = New-ScheduledTaskSettingsSet `
                 -ExecutionTimeLimit ([TimeSpan]::Zero)        # 0 = run forever
 
 # Run under your own user account, only when you're logged in (no admin needed).
-$principal = New-ScheduledTaskPrincipal -UserId $env:USERNAME -LogonType Interactive
+$principal = New-ScheduledTaskPrincipal -UserId $CurrentUser -LogonType Interactive
 
 # --- Register (or replace) the task ----------------------------------
 Register-ScheduledTask -TaskName $TaskName `
@@ -88,9 +94,37 @@ Write-Host ""
 
 # --- Start it right now so you don't have to log out/in --------------
 Start-ScheduledTask -TaskName $TaskName
-Start-Sleep -Seconds 2
+Start-Sleep -Seconds 4
 $state = (Get-ScheduledTask -TaskName $TaskName).State
+$info  = Get-ScheduledTask -TaskName $TaskName | Get-ScheduledTaskInfo
 Write-Host "Started it now. Current state: $state" -ForegroundColor Green
+$pyAlive = Get-CimInstance Win32_Process -Filter "Name='python.exe'" -ErrorAction SilentlyContinue |
+           Where-Object { $_.CommandLine -like "*main.py*" }
+
+if ($state -eq "Running" -or $pyAlive) {
+    Write-Host "CONFIRMED: the bot is running in the background. " -ForegroundColor Green
+} else {
+    # --- Self-diagnosis: tell the user WHY it didn't start ------------
+    Write-Host ""
+    Write-Host "The task did not stay running. Here is the diagnostic info:" -ForegroundColor Yellow
+    Write-Host ("  LastTaskResult : 0x{0:X8}  (decimal {1})" -f $info.LastTaskResult, $info.LastTaskResult)
+    Write-Host "  LastRunTime    : $($info.LastRunTime)"
+    Write-Host ""
+    Write-Host "Pulling the Windows Task Scheduler event log for the real reason..." -ForegroundColor Yellow
+    try { wevtutil.exe set-log "Microsoft-Windows-TaskScheduler/Operational" /enabled:true 2>$null } catch {}
+    $events = Get-WinEvent -LogName "Microsoft-Windows-TaskScheduler/Operational" `
+                -MaxEvents 40 -ErrorAction SilentlyContinue |
+              Where-Object { $_.Message -match "AI-Trader" } |
+              Select-Object -First 6 TimeCreated, Id, LevelDisplayName, Message
+    if ($events) {
+        $events | Format-List
+    } else {
+        Write-Host "(No event-log entries yet. They may appear on the next run; the log" -ForegroundColor DarkGray
+        Write-Host " was just enabled. Re-run this script once more to capture them.)" -ForegroundColor DarkGray
+    }
+    Write-Host ""
+    Write-Host "Copy everything above and send it back for the exact fix." -ForegroundColor Yellow
+}
 Write-Host ""
 Write-Host "WHAT TO DO NEXT:" -ForegroundColor Cyan
 Write-Host "  * Watch what it's doing (live log):"
