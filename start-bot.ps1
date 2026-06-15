@@ -21,4 +21,10 @@ if (-not (Test-Path $Python)) {
 }
 
 Set-Location $ProjectDir
-& $Python (Join-Path $ProjectDir "main.py")
+
+# Run the bot. Capture all output (including any startup crash that happens
+# before the bot's own logging kicks in) to bot-console.log, while ALSO
+# showing it on screen when run interactively. This file is our safety net
+# for diagnosing problems when the bot is launched by Task Scheduler.
+$consoleLog = Join-Path $ProjectDir "bot-console.log"
+& $Python (Join-Path $ProjectDir "main.py") 2>&1 | Tee-Object -FilePath $consoleLog -Append

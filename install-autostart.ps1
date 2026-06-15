@@ -45,11 +45,16 @@ if (-not (Test-Path (Join-Path $ProjectDir ".env"))) {
 }
 
 # --- Define the scheduled task ---------------------------------------
-# Action: run the venv's python on main.py, starting in the project folder
-# (so it finds .env, writes to logs\, and sees the KILL_SWITCH file).
-$action = New-ScheduledTaskAction -Execute $Python `
-                                  -Argument "`"$MainPy`"" `
-                                  -WorkingDirectory $ProjectDir
+# We launch through powershell.exe running start-bot.ps1 (rather than pointing
+# Task Scheduler directly at the venv's python.exe). powershell.exe is a stable,
+# always-present program that Task Scheduler launches reliably, and start-bot.ps1
+# captures any startup output to bot-console.log so problems are visible.
+$startScript = Join-Path $ProjectDir "start-bot.ps1"
+$psExe       = (Get-Command powershell.exe).Source
+
+$action = New-ScheduledTaskAction -Execute $psExe `
+            -Argument "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$startScript`"" `
+            -WorkingDirectory $ProjectDir
 
 # Trigger: every time you log on to Windows.
 $trigger = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME
