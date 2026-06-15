@@ -147,14 +147,17 @@ def main() -> None:
                 if market_was_open:
                     last_action_date = today
 
+            # Sleep INSIDE the try so a Ctrl+C during the wait (where the bot
+            # spends almost all of its time) is caught and handled cleanly.
+            time.sleep(cfg.loop_interval_seconds)
+
         except KeyboardInterrupt:
             log.info("Ctrl+C received. Shutting down cleanly. Goodbye.")
             break
         except Exception as exc:  # never let one bad cycle kill the bot
             log.exception("A cycle hit an unexpected error (will retry next "
                           "wake-up): %s", exc)
-
-        time.sleep(cfg.loop_interval_seconds)
+            time.sleep(cfg.loop_interval_seconds)
 
 
 if __name__ == "__main__":
