@@ -272,11 +272,18 @@ What to expect:
 > a tool like `tmux`. Start by just running it in a terminal and watching it,
 > though.
 >
-> **Windows users:** there are ready-made helper scripts in this folder:
-> - `.\install-autostart.ps1` — sets up the bot to launch automatically every
->   time you log in (and restart itself if it crashes). Run once.
-> - `.\uninstall-autostart.ps1` — removes that auto-start.
-> - `.\start-bot.ps1` — run the bot manually in the current window.
+> **Windows users:** there are ready-made helper scripts in this folder.
+> **Recommended (reliable on all PCs) — the Startup-folder method:**
+> - `.\install-startup.ps1` — starts the bot now (hidden) and makes it
+>   auto-start every time you log in. Run once.
+> - `.\stop-bot.ps1` — stop the running bot.
+> - `.\uninstall-startup.ps1` — remove auto-start at login.
+> - `.\start-bot.ps1` — run the bot in the current window (you watch it live).
+>
+> There are also `install-autostart.ps1` / `uninstall-autostart.ps1` which use
+> Windows Task Scheduler. Those are "more correct" in theory but can be blocked
+> by security policy on some PCs; if `install-autostart.ps1` shows the task
+> stuck at `Ready`, use `install-startup.ps1` instead.
 
 ---
 

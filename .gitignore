@@ -13,6 +13,7 @@ env/
 logs/
 *.log
 bot-console.log
+bot-error.log
 
 # Kill switch (local-only control file)
 KILL_SWITCH
