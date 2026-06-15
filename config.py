@@ -103,7 +103,7 @@ def load_config() -> Config:
         rsi_period=_get_int("RSI_PERIOD", "14"),
         rsi_buy_below=_get_float("RSI_BUY_BELOW", "35"),
         rsi_sell_above=_get_float("RSI_SELL_ABOVE", "70"),
-        loop_interval_seconds=_get_int("LOOP_INTERVAL_SECONDS", "3600"),
+        loop_interval_seconds=_get_int("LOOP_INTERVAL_SECONDS", "900"),
     )
 
 
