@@ -22,6 +22,7 @@ To stop the bot: press Ctrl+C, or create the KILL_SWITCH file.
 
 from __future__ import annotations
 
+import os
 import time
 from datetime import datetime, timezone
 
@@ -31,6 +32,35 @@ from trader.data_feed import DataFeed
 from trader.execution import Execution
 from trader.logger import setup_logger
 from trader.strategy import Action
+
+
+def acquire_single_instance_lock(lock_path: str):
+    """
+    Make sure only ONE copy of the bot can run at a time.
+
+    Plain English:
+        If you accidentally start the bot twice, two copies would both try to
+        trade the same account and could double up on orders. To prevent that,
+        we grab an exclusive lock on a small file. The operating system holds
+        this lock for as long as this program is alive and releases it AUTOMATIC-
+        ALLY if the program ever stops or crashes — so there's no stale lock to
+        clean up by hand.
+
+    Returns the open file handle (keep it alive for the whole run) if we got the
+    lock, or None if another copy already holds it.
+    """
+    f = open(lock_path, "w")
+    try:
+        if os.name == "nt":               # Windows
+            import msvcrt
+            msvcrt.locking(f.fileno(), msvcrt.LK_NBLCK, 1)
+        else:                              # macOS / Linux
+            import fcntl
+            fcntl.flock(f.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        f.close()
+        return None
+    return f
 
 
 def run_once(cfg, feed: DataFeed, execu: Execution, log) -> bool:
@@ -118,6 +148,15 @@ def main() -> None:
     log.info("Starting AI-Trader. Mode: %s. Symbol: %s.", mode, cfg.symbol)
     log.info("Guardrails: floor=$%.2f  max-position=$%.2f  max-daily-loss=$%.2f",
              cfg.account_floor, cfg.max_position_notional, cfg.max_daily_loss)
+
+    # Refuse to start if another copy of the bot is already running, so two
+    # copies can never trade the same account at once. Keep `lock` referenced
+    # for the whole run; the OS frees it automatically when we exit.
+    lock = acquire_single_instance_lock(cfg.lock_path)
+    if lock is None:
+        log.warning("Another AI-Trader instance is already running. "
+                    "Exiting this copy to avoid double-trading. (This is a safety stop.)")
+        return
 
     # THE SAFETY GATE: blocks (and may exit) if live trading isn't confirmed.
     confirm_live_trading_or_exit(cfg)

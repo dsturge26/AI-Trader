@@ -86,6 +86,7 @@ class Config:
     # --- Local file locations (absolute, anchored to the project folder) ---
     kill_switch_path: str = str(PROJECT_ROOT / "KILL_SWITCH")
     logs_dir: str = str(PROJECT_ROOT / "logs")
+    lock_path: str = str(PROJECT_ROOT / "bot.lock")
 
 
 def load_config() -> Config:
