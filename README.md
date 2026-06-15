@@ -271,6 +271,12 @@ What to expect:
 > you can use `nohup python main.py &` (macOS/Linux), Windows Task Scheduler, or
 > a tool like `tmux`. Start by just running it in a terminal and watching it,
 > though.
+>
+> **Windows users:** there are ready-made helper scripts in this folder:
+> - `.\install-autostart.ps1` — sets up the bot to launch automatically every
+>   time you log in (and restart itself if it crashes). Run once.
+> - `.\uninstall-autostart.ps1` — removes that auto-start.
+> - `.\start-bot.ps1` — run the bot manually in the current window.
 
 ---
 
