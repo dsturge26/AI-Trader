@@ -14,11 +14,19 @@ from __future__ import annotations
 import os
 import sys
 from dataclasses import dataclass
+from pathlib import Path
 
 from dotenv import load_dotenv
 
-# Read the .env file (if present) and load its values into the environment.
-load_dotenv()
+# The project's root folder = the folder this file lives in. We anchor every
+# file path (the .env, the logs folder, the kill switch) to THIS, so the bot
+# works no matter what folder it's launched from. (Windows Task Scheduler, for
+# example, starts programs in C:\Windows\System32 — without this, the bot
+# couldn't find its own .env file and would exit instantly.)
+PROJECT_ROOT = Path(__file__).resolve().parent
+
+# Read the .env file (using its absolute path) into the environment.
+load_dotenv(PROJECT_ROOT / ".env")
 
 
 def _get(name: str, default: str | None = None) -> str:
@@ -75,8 +83,9 @@ class Config:
     # --- Loop timing ---
     loop_interval_seconds: int
 
-    # --- Local control file ---
-    kill_switch_path: str = "KILL_SWITCH"
+    # --- Local file locations (absolute, anchored to the project folder) ---
+    kill_switch_path: str = str(PROJECT_ROOT / "KILL_SWITCH")
+    logs_dir: str = str(PROJECT_ROOT / "logs")
 
 
 def load_config() -> Config:

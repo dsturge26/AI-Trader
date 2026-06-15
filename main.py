@@ -112,7 +112,7 @@ def run_once(cfg, feed: DataFeed, execu: Execution, log) -> bool:
 
 def main() -> None:
     cfg = load_config()
-    log = setup_logger()
+    log = setup_logger(cfg.logs_dir)
 
     mode = "PAPER (fake money)" if cfg.paper else "LIVE (REAL money)"
     log.info("Starting AI-Trader. Mode: %s. Symbol: %s.", mode, cfg.symbol)
