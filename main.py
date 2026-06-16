@@ -140,6 +140,31 @@ def run_once(cfg, feed: DataFeed, execu: Execution, log) -> bool:
     return True
 
 
+def prevent_system_sleep(log) -> None:
+    """
+    Ask Windows to stay awake while the bot runs.
+
+    Plain English:
+        An "always-on" trading bot is useless if the PC falls asleep, because
+        a sleeping computer freezes the bot and it misses market hours. On
+        Windows we tell the operating system "keep the system running while I'm
+        alive." This lets the screen turn off (fine) but stops the machine from
+        going to sleep on its own. It only lasts while the bot is running.
+    """
+    if os.name != "nt":
+        return  # not Windows; nothing to do
+    try:
+        import ctypes
+        ES_CONTINUOUS = 0x80000000
+        ES_SYSTEM_REQUIRED = 0x00000001
+        ctypes.windll.kernel32.SetThreadExecutionState(ES_CONTINUOUS | ES_SYSTEM_REQUIRED)
+        log.info("Sleep prevention is ON: the PC will stay awake while the bot runs "
+                 "(the screen may still turn off — that's fine).")
+    except Exception as exc:
+        log.warning("Could not enable sleep prevention (%s). If your PC sleeps, the "
+                    "bot will pause and may miss market hours.", exc)
+
+
 def main() -> None:
     cfg = load_config()
     log = setup_logger(cfg.logs_dir)
@@ -148,6 +173,9 @@ def main() -> None:
     log.info("Starting AI-Trader. Mode: %s. Symbol: %s.", mode, cfg.symbol)
     log.info("Guardrails: floor=$%.2f  max-position=$%.2f  max-daily-loss=$%.2f",
              cfg.account_floor, cfg.max_position_notional, cfg.max_daily_loss)
+
+    # Keep the PC awake so an always-on bot doesn't sleep through market hours.
+    prevent_system_sleep(log)
 
     # Refuse to start if another copy of the bot is already running, so two
     # copies can never trade the same account at once. Keep `lock` referenced
