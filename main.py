@@ -103,9 +103,10 @@ def run_once(cfg, feed: DataFeed, execu: Execution, log) -> bool:
         holding=holding,
         rsi_buy_below=cfg.rsi_buy_below,
         rsi_sell_above=cfg.rsi_sell_above,
+        sma_period=cfg.sma_trend_period,
     )
-    log.info("Indicators for %s: price=$%.2f  50-day-avg=$%.2f  RSI=%.1f",
-             cfg.symbol, decision.price, decision.sma, decision.rsi)
+    log.info("Indicators for %s: price=$%.2f  %d-day-avg=$%.2f  RSI=%.1f",
+             cfg.symbol, decision.price, cfg.sma_trend_period, decision.sma, decision.rsi)
     log.info("Strategy decision: %s", decision.reason)
 
     # --- (f + g) Risk-check the decision, then maybe act --------------

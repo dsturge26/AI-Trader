@@ -69,6 +69,7 @@ def decide(
     holding: bool,
     rsi_buy_below: float,
     rsi_sell_above: float,
+    sma_period: int = 50,
 ) -> Decision:
     """
     Look at the most recent row of indicators and return a Decision.
@@ -93,8 +94,8 @@ def decide(
         )
 
     uptrend = price > sma
-    trend_word = "UPTREND (price above its 50-day average)" if uptrend \
-        else "DOWNTREND (price below its 50-day average)"
+    trend_word = (f"UPTREND (price above its {sma_period}-day average)" if uptrend
+                  else f"DOWNTREND (price below its {sma_period}-day average)")
 
     if holding:
         # We own it. Look for a reason to SELL; otherwise hold.
@@ -110,8 +111,8 @@ def decide(
             return Decision(
                 action=Action.SELL,
                 reason=(f"SELL: We own it but the price ({price:.2f}) fell "
-                        f"below its 50-day average ({sma:.2f}). The healthy "
-                        f"uptrend broke, so we exit to protect ourselves."),
+                        f"below its {sma_period}-day average ({sma:.2f}). The "
+                        f"healthy uptrend broke, so we exit to protect ourselves."),
                 price=price, sma=sma, rsi=rsi,
             )
         return Decision(
