@@ -15,11 +15,25 @@ Plain English:
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+from datetime import datetime, timezone
+
 from alpaca.trading.client import TradingClient
 from alpaca.trading.enums import OrderSide, TimeInForce
 from alpaca.trading.requests import MarketOrderRequest
 
 from .risk import AccountSnapshot
+
+
+@dataclass
+class OpenPosition:
+    """A single position we currently hold, with the few numbers the
+    day-trader needs to manage it."""
+    symbol: str
+    qty: float
+    market_value: float        # current dollar value of the position
+    unrealized_plpc: float     # unrealized profit/loss as a FRACTION (0.05 = +5%)
+    current_price: float
 
 
 class Execution:
@@ -56,6 +70,48 @@ class Execution:
             last_equity=float(account.last_equity),
             position_notional=self.position_notional(symbol),
         )
+
+    def account_snapshot(self) -> AccountSnapshot:
+        """
+        Like snapshot(), but for the day-trader, which holds MANY symbols at
+        once. `position_notional` here is the TOTAL dollar value across every
+        open position (the global guardrails only care about account totals).
+        """
+        account = self._client.get_account()
+        total = sum(abs(float(p.market_value)) for p in self._client.get_all_positions())
+        return AccountSnapshot(
+            equity=float(account.equity),
+            last_equity=float(account.last_equity),
+            position_notional=total,
+        )
+
+    def list_positions(self) -> list[OpenPosition]:
+        """Every position we currently hold, as simple OpenPosition records."""
+        out: list[OpenPosition] = []
+        for p in self._client.get_all_positions():
+            out.append(OpenPosition(
+                symbol=p.symbol,
+                qty=float(p.qty),
+                market_value=abs(float(p.market_value)),
+                unrealized_plpc=float(p.unrealized_plpc),
+                current_price=float(p.current_price),
+            ))
+        return out
+
+    def buying_power(self) -> float:
+        """Cash available to open new positions right now."""
+        return float(self._client.get_account().buying_power)
+
+    def minutes_to_close(self) -> float:
+        """
+        Minutes until the market closes today (0.0 if it's already closed).
+        Used to flatten day-trades before the bell so nothing is held overnight.
+        """
+        clock = self._client.get_clock()
+        if not clock.is_open:
+            return 0.0
+        now = clock.timestamp or datetime.now(timezone.utc)
+        return max(0.0, (clock.next_close - now).total_seconds() / 60.0)
 
     # ---- Placing orders -----------------------------------------------
 

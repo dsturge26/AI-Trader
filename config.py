@@ -57,6 +57,12 @@ def _get_bool(name: str, default: str) -> bool:
     return _get(name, default).strip().lower() in ("true", "1", "yes", "on")
 
 
+def _get_list(name: str, default: str) -> list[str]:
+    """Read a comma-separated setting into a clean list of UPPERCASE symbols."""
+    raw = _get(name, default)
+    return [item.strip().upper() for item in raw.split(",") if item.strip()]
+
+
 @dataclass
 class Config:
     """All the bot's settings, grouped in one tidy object."""
@@ -66,7 +72,11 @@ class Config:
     secret_key: str
     paper: bool          # True = fake money (safe). False = REAL money.
 
-    # --- What to trade ---
+    # --- Which brain to use: "swing" (buy dips, once a day) or
+    #     "momentum" (day-trade today's biggest gainers) ---
+    strategy: str
+
+    # --- What to trade (swing mode only; momentum scans the whole market) ---
     symbol: str
 
     # --- Hard money guardrails (dollars) ---
@@ -74,11 +84,22 @@ class Config:
     max_position_notional: float
     max_daily_loss: float
 
-    # --- Strategy knobs ---
+    # --- Swing-strategy knobs ---
     sma_trend_period: int
     rsi_period: int
     rsi_buy_below: float
     rsi_sell_above: float
+
+    # --- Momentum (day-trader) knobs ---
+    take_profit_pct: float            # sell a winner once it's up this %
+    stop_loss_pct: float              # sell a loser once it's down this %
+    max_open_positions: int           # how many movers to hold at once
+    min_gainer_pct: float             # ignore movers smaller than this
+    max_gainer_pct: float             # ignore movers bigger than this (skip mania)
+    min_price: float                  # ignore stocks cheaper than this (penny junk)
+    scan_top: int                     # how many top movers to pull from the feed
+    flatten_minutes_before_close: float  # sell everything this long before close
+    watchlist: list[str]              # fallback tickers if the movers feed is off
 
     # --- Loop timing ---
     loop_interval_seconds: int
@@ -95,6 +116,7 @@ def load_config() -> Config:
         api_key=_get("ALPACA_API_KEY"),
         secret_key=_get("ALPACA_SECRET_KEY"),
         paper=_get_bool("ALPACA_PAPER", "true"),
+        strategy=_get("STRATEGY", "swing").strip().lower(),
         symbol=_get("SYMBOL", "SPY").upper().strip(),
         account_floor=_get_float("ACCOUNT_FLOOR", "35"),
         max_position_notional=_get_float("MAX_POSITION_NOTIONAL", "25"),
@@ -103,6 +125,15 @@ def load_config() -> Config:
         rsi_period=_get_int("RSI_PERIOD", "14"),
         rsi_buy_below=_get_float("RSI_BUY_BELOW", "35"),
         rsi_sell_above=_get_float("RSI_SELL_ABOVE", "70"),
+        take_profit_pct=_get_float("TAKE_PROFIT_PCT", "10"),
+        stop_loss_pct=_get_float("STOP_LOSS_PCT", "5"),
+        max_open_positions=_get_int("MAX_OPEN_POSITIONS", "5"),
+        min_gainer_pct=_get_float("MIN_GAINER_PCT", "5"),
+        max_gainer_pct=_get_float("MAX_GAINER_PCT", "1000"),
+        min_price=_get_float("MIN_PRICE", "2"),
+        scan_top=_get_int("SCAN_TOP", "50"),
+        flatten_minutes_before_close=_get_float("FLATTEN_MINUTES_BEFORE_CLOSE", "10"),
+        watchlist=_get_list("WATCHLIST", ""),
         loop_interval_seconds=_get_int("LOOP_INTERVAL_SECONDS", "900"),
     )
 
