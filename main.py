@@ -239,27 +239,48 @@ def run_momentum_once(cfg, scanner: Scanner, execu: Execution, log) -> None:
         return
 
     for c in picks:
+        # Size by WHOLE shares so non-fractionable movers work too: as many
+        # shares as fit under the per-position cap (e.g. $25 / $6 -> 4 shares).
+        if c.price <= 0:
+            continue
+        qty = int(cfg.max_position_notional // c.price)
+        if qty < 1:
+            log.info("Skipping %s: $%.2f/share is above the $%.0f per-trade cap "
+                     "(can't afford even 1 share).",
+                     c.symbol, c.price, cfg.max_position_notional)
+            continue
+        intended = qty * c.price
+
         # Each new buy is a fresh symbol, so its current holding is $0. We reuse
         # the SAME per-trade guardrail the swing strategy uses.
         trade_snap = AccountSnapshot(
             equity=snap.equity, last_equity=snap.last_equity, position_notional=0.0,
         )
-        size = risk.buy_notional(trade_snap, max_position_notional=cfg.max_position_notional)
         verdict = risk.check_buy_allowed(
             trade_snap,
-            intended_notional=size,
+            intended_notional=intended,
             max_position_notional=cfg.max_position_notional,
             account_floor=cfg.account_floor,
         )
         if not verdict.allowed:
             log.warning("Skipping %s: %s", c.symbol, verdict.reason)
             continue
-        if size > execu.buying_power():
-            log.warning("Skipping %s: not enough buying power for $%.2f.", c.symbol, size)
+        if intended > execu.buying_power():
+            log.warning("Skipping %s: not enough buying power for %d sh (~$%.2f).",
+                        c.symbol, qty, intended)
             continue
-        execu.buy_notional(c.symbol, size)
-        log.info("ORDER PLACED: BUY $%.2f of %s — up %+.1f%% today (a pump). "
-                 "Riding the momentum.", size, c.symbol, c.percent_change)
+
+        # Isolate each order: if ONE symbol is rejected (halted, untradable,
+        # etc.), skip it and keep going instead of crashing the whole cycle.
+        try:
+            execu.buy_shares(c.symbol, qty)
+            log.info("ORDER PLACED: BUY %d sh of %s (~$%.2f) — up %+.1f%% today "
+                     "(a pump). Riding the momentum.",
+                     qty, c.symbol, intended, c.percent_change)
+        except Exception as exc:  # noqa: BLE001 - one bad symbol must not stop the rest
+            log.warning("Couldn't buy %s (%s). Skipping it and moving on.",
+                        c.symbol, exc)
+            continue
 
 
 def prevent_system_sleep(log) -> None:

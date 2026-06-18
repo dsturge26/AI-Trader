@@ -125,6 +125,25 @@ class Execution:
         )
         return self._client.submit_order(order_data=order)
 
+    def buy_shares(self, symbol: str, qty: int):
+        """
+        Buy a WHOLE number of shares of `symbol` at market.
+
+        Plain English:
+            "Buy $25 worth" (notional) only works for stocks Alpaca lets you
+            split into fractions. Many of the day's biggest movers are small,
+            low-priced stocks that are NOT fractionable, so those dollar orders
+            get rejected. Ordering whole shares ("buy 4 shares") works for ANY
+            stock, so the day-trader uses this instead.
+        """
+        order = MarketOrderRequest(
+            symbol=symbol,
+            qty=qty,
+            side=OrderSide.BUY,
+            time_in_force=TimeInForce.DAY,
+        )
+        return self._client.submit_order(order_data=order)
+
     def sell_all(self, symbol: str):
         """Sell our entire position in `symbol` (a full exit)."""
         # close_position liquidates the whole position with one call.
