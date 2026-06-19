@@ -24,7 +24,10 @@ Stop it with Ctrl+C. It is READ-ONLY: it never places or cancels an order.
 
 from __future__ import annotations
 
+import base64
+import hmac
 import json
+import os
 import sys
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -39,6 +42,13 @@ cfg = load_config()
 # the same ALPACA_PAPER switch the bot uses, so the dashboard always shows the
 # SAME account the bot is trading.
 client = TradingClient(cfg.api_key, cfg.secret_key, paper=cfg.paper)
+
+# Optional password protection. If DASHBOARD_PASSWORD is set in .env, every
+# request must supply this username/password (HTTP Basic Auth). Leave the
+# password blank for an open dashboard on localhost only. ALWAYS set a password
+# before exposing the dashboard to the internet (e.g. via Tailscale Funnel).
+DASH_USER = os.getenv("DASHBOARD_USER", "admin")
+DASH_PASS = os.getenv("DASHBOARD_PASSWORD", "")
 
 
 def _iso(dt) -> str | None:
@@ -266,7 +276,31 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _authorized(self) -> bool:
+        """True if no password is required, or the right one was supplied."""
+        if not DASH_PASS:
+            return True  # no password configured -> open (localhost use)
+        header = self.headers.get("Authorization", "")
+        if not header.startswith("Basic "):
+            return False
+        try:
+            user, _, pw = base64.b64decode(header[6:]).decode("utf-8").partition(":")
+        except Exception:  # noqa: BLE001 - malformed header = not authorized
+            return False
+        # Constant-time compares so the password can't be guessed by timing.
+        return (hmac.compare_digest(user, DASH_USER)
+                and hmac.compare_digest(pw, DASH_PASS))
+
+    def _ask_for_password(self):
+        self.send_response(401)
+        self.send_header("WWW-Authenticate", 'Basic realm="AI-Trader Dashboard"')
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
     def do_GET(self):  # noqa: N802 (name fixed by BaseHTTPRequestHandler)
+        if not self._authorized():
+            self._ask_for_password()
+            return
         if self.path.startswith("/api/data"):
             try:
                 payload = gather_data()
@@ -288,6 +322,11 @@ def main() -> None:
     server = ThreadingHTTPServer(("127.0.0.1", port), Handler)
     print(f"AI-Trader dashboard [{mode}] running.")
     print(f"  Open your browser to:  http://localhost:{port}")
+    if DASH_PASS:
+        print(f"  Password protection: ON (user '{DASH_USER}').")
+    else:
+        print("  Password protection: OFF. Fine on localhost, but set "
+              "DASHBOARD_PASSWORD in .env BEFORE exposing this to the internet.")
     print("  It refreshes every 15s; press the Refresh button any time. Ctrl+C to stop.")
     try:
         server.serve_forever()
